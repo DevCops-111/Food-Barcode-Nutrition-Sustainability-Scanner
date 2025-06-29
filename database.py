@@ -20,3 +20,4 @@ async def ensure_indexes():
         "fetched_at",
         expireAfterSeconds=86400
     )
+print("🚀 MONGO_URI:", os.environ.get("MONGODB_URI"))
