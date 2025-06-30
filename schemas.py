@@ -1,5 +1,26 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Any
+from bson import ObjectId
+
+
+# === Helper for serializing ObjectId ===
+class PyObjectId(ObjectId):
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v: Any):
+        if not ObjectId.is_valid(v):
+            raise ValueError("Invalid ObjectId")
+        return ObjectId(str(v))
+
+    @classmethod
+    def __modify_schema__(cls, field_schema):
+        field_schema.update(type="string")
+
+
+# === Submodels ===
 
 class Nutriments(BaseModel):
     calories: Optional[float]
@@ -7,10 +28,14 @@ class Nutriments(BaseModel):
     sugar: Optional[float]
     sodium: Optional[float]
 
+
 class EcoScore(BaseModel):
     eco_score: Optional[int]
     carbon_footprint: Optional[float]
     packaging_recyclable: Optional[bool]
+
+
+# === Main Product Model ===
 
 class ProductOut(BaseModel):
     barcode: str
@@ -18,29 +43,44 @@ class ProductOut(BaseModel):
     brand: Optional[str]
     category: Optional[str]
     ingredients: Optional[List[str]]
-    # Rename the field to "id", but alias from "_id" in the DB document:
-    id: str = Field(..., alias="_id")
+
+    # Correctly handle MongoDB ObjectId with alias
+    id: PyObjectId = Field(..., alias="_id")
+
     nutriments: Optional[Nutriments]
     allergens: Optional[List[str]]
     eco: Optional[EcoScore]
 
-    model_config = {
-        "populate_by_name": True,  # allows you to read/write "id" by alias "_id"
-    }
+    class Config:
+        populate_by_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {
+            ObjectId: str
+        }
+
+
+# === Error Wrapper Model ===
 
 class ErrorOut(BaseModel):
     barcode: str
     error: str
+
+
+# === Batch Metadata and Result Response ===
 
 class BatchMetadata(BaseModel):
     requested: int
     fetched: int
     cached: int
 
+
 class BatchResponse(BaseModel):
     metadata: BatchMetadata
     results: List[Union[ProductOut, ErrorOut]]
 
-    model_config = {
-        "populate_by_name": True,
-    }
+    class Config:
+        populate_by_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {
+            ObjectId: str
+        }
