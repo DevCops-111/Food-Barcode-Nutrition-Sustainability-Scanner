@@ -1,23 +1,35 @@
-from pydantic import BaseModel, Field
 from typing import List, Optional, Union, Any
 from bson import ObjectId
+from pydantic import BaseModel, Field
+from pydantic_core import core_schema
+from pydantic import GetCoreSchemaHandler, GetJsonSchemaHandler
+from pydantic.json_schema import JsonSchemaValue
 
 
-# === Helper for serializing ObjectId ===
+# === Custom ObjectId Support for Pydantic v2 ===
 class PyObjectId(ObjectId):
     @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        return core_schema.no_info_after_validator_function(
+            cls.validate,
+            core_schema.str_schema()
+        )
 
     @classmethod
-    def validate(cls, v: Any):
-        if not ObjectId.is_valid(v):
-            raise ValueError("Invalid ObjectId")
-        return ObjectId(str(v))
+    def __get_pydantic_json_schema__(
+        cls, core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return {"type": "string"}
 
     @classmethod
-    def __modify_schema__(cls, field_schema):
-        field_schema.update(type="string")
+    def validate(cls, v: Any) -> "PyObjectId":
+        if isinstance(v, ObjectId):
+            return v
+        if isinstance(v, str) and ObjectId.is_valid(v):
+            return ObjectId(v)
+        raise ValueError("Invalid ObjectId")
 
 
 # === Submodels ===
@@ -43,10 +55,7 @@ class ProductOut(BaseModel):
     brand: Optional[str]
     category: Optional[str]
     ingredients: Optional[List[str]]
-
-    # Correctly handle MongoDB ObjectId with alias
     id: PyObjectId = Field(..., alias="_id")
-
     nutriments: Optional[Nutriments]
     allergens: Optional[List[str]]
     eco: Optional[EcoScore]
