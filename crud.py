@@ -296,7 +296,12 @@ async def get_product(collection: AsyncIOMotorCollection, barcode: str) -> Optio
 
 async def search_products(collection: AsyncIOMotorCollection, query: Dict[str, Any]) -> List[Dict[str, Any]]:
     cursor = collection.find(query)
-    return await cursor.to_list(length=100)
+    results = await cursor.to_list(length=100)
+    for doc in results:
+        if "_id" in doc:
+            doc["_id"] = str(doc["_id"])  # Convert ObjectId to str
+    return results
+
 
 
 async def search_products(collection: AsyncIOMotorCollection, query: Dict[str, Any]) -> List[Dict[str, Any]]:
