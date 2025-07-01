@@ -178,6 +178,6 @@ async def get_eco(barcode: str):
 async def search(q: str = Query(..., min_length=2)):
     return await crud.search_products(collection, q)
 
-@app.get("/")
-def read_root():
+@app.get("/", include_in_schema=False)
+async def read_root():
     return {"message": "Welcome to the Food Barcode Nutrition & Sustainability API"}
